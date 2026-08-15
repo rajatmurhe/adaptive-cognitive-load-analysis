@@ -1,0 +1,45 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load logged cognitive data
+data = pd.read_csv("cognitive_data.csv")
+
+# Compute correlation matrix
+corr = data[["BlinkRate", "Stress", "Distraction", "CognitiveLoad"]].corr()
+
+print("Correlation Matrix:\n")
+print(corr)
+
+# Plot correlation heatmap (simple, faculty-friendly)
+plt.figure(figsize=(6,5))
+plt.imshow(corr, cmap="coolwarm", interpolation="nearest")
+plt.colorbar()
+
+plt.xticks(range(len(corr.columns)), corr.columns, rotation=45)
+plt.yticks(range(len(corr.columns)), corr.columns)
+
+plt.title("Correlation Between Cognitive Signals")
+plt.tight_layout()
+plt.show()
+
+# Plot Cognitive Load vs individual signals
+plt.figure(figsize=(10,4))
+
+plt.subplot(1,3,1)
+plt.scatter(data["BlinkRate"], data["CognitiveLoad"])
+plt.xlabel("Blink Rate")
+plt.ylabel("Cognitive Load")
+plt.title("Blink Rate vs Cognitive Load")
+
+plt.subplot(1,3,2)
+plt.scatter(data["Distraction"], data["CognitiveLoad"])
+plt.xlabel("Gaze Deviation")
+plt.title("Gaze Deviation vs Cognitive Load")
+
+plt.subplot(1,3,3)
+plt.scatter(data["Stress"], data["CognitiveLoad"])
+plt.xlabel("Head Jitter (Stress)")
+plt.title("Stress vs Cognitive Load")
+
+plt.tight_layout()
+plt.show()
