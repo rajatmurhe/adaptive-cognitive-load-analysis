@@ -9,16 +9,32 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+
+# ============================================================
+# PROJECT PATHS
+# ============================================================
+
 PROJECT_ROOT = os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))
+    os.path.dirname(
+        os.path.abspath(__file__)
+    )
 )
 
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+
+# ============================================================
+# PROJECT IMPORTS
+# ============================================================
+
 from backend.cognitive_engine import CognitiveEngine
 from analysis.analysis_service import generate_latest_report
 
+
+# ============================================================
+# APP
+# ============================================================
 
 app = FastAPI(
     title="Adaptive Cognitive Vision API",
@@ -55,17 +71,26 @@ OUTPUT_DIR = os.path.join(
     "outputs"
 )
 
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(
+    DATA_DIR,
+    exist_ok=True
+)
+
+os.makedirs(
+    OUTPUT_DIR,
+    exist_ok=True
+)
 
 
 # ============================================================
-# STATIC OUTPUTS
+# STATIC OUTPUT FILES
 # ============================================================
 
 app.mount(
     "/outputs",
-    StaticFiles(directory=OUTPUT_DIR),
+    StaticFiles(
+        directory=OUTPUT_DIR
+    ),
     name="outputs"
 )
 
@@ -76,6 +101,7 @@ app.mount(
 
 @app.get("/")
 async def root():
+
     return {
         "status": "online",
         "service": "Adaptive Cognitive Vision API"
@@ -88,13 +114,14 @@ async def root():
 
 @app.get("/health")
 async def health():
+
     return {
         "status": "healthy"
     }
 
 
 # ============================================================
-# REPORT
+# LATEST REPORT
 # ============================================================
 
 @app.get("/report/latest")
@@ -102,12 +129,15 @@ async def latest_report():
 
     try:
 
+        print()
         print(
-            "\n=========================================="
+            "=========================================="
         )
+
         print(
             "REPORT REQUEST RECEIVED"
         )
+
         print(
             "=========================================="
         )
@@ -120,56 +150,50 @@ async def latest_report():
             f"Output directory: {OUTPUT_DIR}"
         )
 
-        # ----------------------------------------------------
         # Generate report
-        # ----------------------------------------------------
-
         pdf_path = generate_latest_report()
 
         print(
             f"Report generator returned: {pdf_path!r}"
         )
 
-        # ----------------------------------------------------
-        # Validate returned path
-        # ----------------------------------------------------
-
+        # Validate path
         if pdf_path is None:
 
             raise RuntimeError(
-                "Report generator returned None instead of a PDF path."
+                "Report generator returned None."
             )
 
-        pdf_path = os.fspath(pdf_path)
+        pdf_path = os.fspath(
+            pdf_path
+        )
 
-        # ----------------------------------------------------
-        # Make sure file exists
-        # ----------------------------------------------------
-
-        if not os.path.isfile(pdf_path):
+        # Confirm PDF exists
+        if not os.path.isfile(
+            pdf_path
+        ):
 
             raise FileNotFoundError(
                 f"Generated PDF does not exist: {pdf_path}"
             )
 
-        # ----------------------------------------------------
-        # Make sure PDF is inside public output directory
-        # ----------------------------------------------------
+        # Security check:
+        # PDF must be inside OUTPUT_DIR
+        absolute_pdf = os.path.abspath(
+            pdf_path
+        )
 
-        absolute_pdf = os.path.abspath(pdf_path)
-        absolute_output = os.path.abspath(OUTPUT_DIR)
+        absolute_output = os.path.abspath(
+            OUTPUT_DIR
+        )
 
         if not absolute_pdf.startswith(
             absolute_output + os.sep
         ):
 
             raise RuntimeError(
-                "Generated PDF is outside the public output directory."
+                "Generated PDF is outside the output directory."
             )
-
-        # ----------------------------------------------------
-        # URL
-        # ----------------------------------------------------
 
         filename = os.path.basename(
             absolute_pdf
@@ -193,8 +217,9 @@ async def latest_report():
 
     except Exception as exc:
 
+        print()
         print(
-            "\nREPORT GENERATION ERROR"
+            "REPORT GENERATION ERROR"
         )
 
         print(
@@ -295,11 +320,16 @@ async def websocket_endpoint(
                 continue
 
             # ------------------------------------------------
-            # FEATURE PACKET
+            # IGNORE UNKNOWN MESSAGES
             # ------------------------------------------------
 
             if message_type != "features":
+
                 continue
+
+            # ------------------------------------------------
+            # READ FEATURES
+            # ------------------------------------------------
 
             blink_rate = float(
                 data.get(
@@ -333,7 +363,7 @@ async def websocket_endpoint(
             )
 
             # ------------------------------------------------
-            # SAVE
+            # SAVE CALIBRATION DATA
             # ------------------------------------------------
 
             if result["cli"] is None:
@@ -348,6 +378,10 @@ async def websocket_endpoint(
                     "",
                     ""
                 ])
+
+            # ------------------------------------------------
+            # SAVE LIVE DATA
+            # ------------------------------------------------
 
             else:
 
@@ -365,7 +399,7 @@ async def websocket_endpoint(
             csv_file.flush()
 
             # ------------------------------------------------
-            # RETURN RESULT
+            # SEND RESPONSE
             # ------------------------------------------------
 
             await websocket.send_json({
@@ -382,7 +416,7 @@ async def websocket_endpoint(
     except Exception as exc:
 
         print(
-            "WebSocket error:"
+            "WEBSOCKET ERROR"
         )
 
         print(
@@ -390,15 +424,19 @@ async def websocket_endpoint(
         )
 
         try:
+
             await websocket.close()
+
         except Exception:
             pass
 
     finally:
 
         try:
+
             csv_file.flush()
             csv_file.close()
+
         except Exception:
             pass
 
