@@ -2,12 +2,8 @@
    LIVE DASHBOARD CONTROLLER
 ============================================================ */
 
-
 const cliElement =
     document.getElementById("cliValue");
-
-const phaseElement =
-    document.getElementById("phaseValue");
 
 const startButton =
     document.getElementById("startBtn");
@@ -19,17 +15,21 @@ const chartStatus =
     document.getElementById("chartStatus");
 
 const generateReportButton =
-    document.getElementById(
-        "generateReportBtn"
-    );
+    document.getElementById("generateReportBtn");
 
 const pdfLink =
     document.getElementById("pdfLink");
 
 const reportStatus =
-    document.getElementById(
-        "reportStatus"
-    );
+    document.getElementById("reportStatus");
+
+
+/* ============================================================
+   PUBLIC BACKEND
+============================================================ */
+
+const BACKEND_URL =
+    "https://adaptive-cognitive-load-analysis.onrender.com";
 
 
 /* ============================================================
@@ -41,17 +41,13 @@ const chartValues = [];
 
 let chartCounter = 0;
 
-let sessionRunning = false;
-
 
 /* ============================================================
-   CREATE CHART
+   CHART
 ============================================================ */
 
 const chartCanvas =
-    document.getElementById(
-        "cliChart"
-    );
+    document.getElementById("cliChart");
 
 
 const cliChart =
@@ -65,11 +61,9 @@ const cliChart =
 
                 datasets: [
                     {
-                        label:
-                            "Cognitive Load",
+                        label: "Cognitive Load",
 
-                        data:
-                            chartValues,
+                        data: chartValues,
 
                         borderWidth: 2,
 
@@ -103,9 +97,7 @@ const cliChart =
                     },
 
                     y: {
-
                         min: 0,
-
                         max: 100,
 
                         title: {
@@ -149,9 +141,7 @@ function resetChart() {
    ADD CLI VALUE
 ============================================================ */
 
-function addCLIValue(
-    value
-) {
+function addCLIValue(value) {
 
     if (
         value === null ||
@@ -165,15 +155,12 @@ function addCLIValue(
 
     const numericValue =
         parseFloat(
-            String(value)
-                .replace("%", "")
+            String(value).replace("%", "")
         );
 
 
     if (
-        Number.isNaN(
-            numericValue
-        )
+        Number.isNaN(numericValue)
     ) {
         return;
     }
@@ -181,12 +168,6 @@ function addCLIValue(
 
     chartCounter += 1;
 
-
-    /*
-     * Only keep the latest 180 points.
-     * This prevents the browser chart from
-     * growing forever during a long session.
-     */
 
     if (
         chartLabels.length >= 180
@@ -199,7 +180,7 @@ function addCLIValue(
 
 
     chartLabels.push(
-        `${chartCounter}s`
+        `${chartCounter}`
     );
 
     chartValues.push(
@@ -207,14 +188,12 @@ function addCLIValue(
     );
 
 
-    cliChart.update(
-        "none"
-    );
+    cliChart.update("none");
 }
 
 
 /* ============================================================
-   OBSERVE CLI
+   WATCH CLI
 ============================================================ */
 
 const cliObserver =
@@ -250,15 +229,12 @@ cliObserver.observe(
 
 
 /* ============================================================
-   CAMERA START
+   START CAMERA
 ============================================================ */
 
 startButton.addEventListener(
     "click",
     () => {
-
-        sessionRunning =
-            true;
 
         resetChart();
 
@@ -271,29 +247,25 @@ startButton.addEventListener(
 
         reportStatus.textContent =
             "Session in progress...";
-
     }
 );
 
 
 /* ============================================================
-   CAMERA STOP
+   STOP CAMERA
 ============================================================ */
 
 stopButton.addEventListener(
     "click",
     () => {
 
-        sessionRunning =
-            false;
-
         chartStatus.textContent =
             "Session complete";
 
+
         /*
-         * Give FastAPI a moment to finish
-         * writing the CSV before enabling
-         * report generation.
+         * Wait briefly so FastAPI has time
+         * to finish writing the current session.
          */
 
         setTimeout(
@@ -334,8 +306,16 @@ generateReportButton.addEventListener(
 
             const response =
                 await fetch(
-                    "http://127.0.0.1:8000/report/latest"
+                    `${BACKEND_URL}/report/latest`
                 );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    `Server returned HTTP ${response.status}`
+                );
+            }
 
 
             const result =
@@ -355,9 +335,7 @@ generateReportButton.addEventListener(
 
 
             const pdfUrl =
-                "http://127.0.0.1:8000"
-                +
-                result.pdf;
+                `${BACKEND_URL}${result.pdf}`;
 
 
             pdfLink.href =
@@ -380,6 +358,7 @@ generateReportButton.addEventListener(
         } catch (error) {
 
             console.error(
+                "Report error:",
                 error
             );
 
@@ -388,8 +367,10 @@ generateReportButton.addEventListener(
                 error.message ||
                 "Unable to generate report.";
 
+
             generateReportButton.disabled =
                 false;
+
 
             generateReportButton.textContent =
                 "Generate Report";
