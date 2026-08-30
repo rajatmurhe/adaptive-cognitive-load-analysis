@@ -6,15 +6,23 @@ import {
 
 
 /* ============================================================
-   DOM
+   DOM ELEMENTS
 ============================================================ */
 
-const video = document.getElementById("video");
-const canvas = document.getElementById("overlay");
-const ctx = canvas.getContext("2d");
+const video =
+    document.getElementById("video");
 
-const startBtn = document.getElementById("startBtn");
-const stopBtn = document.getElementById("stopBtn");
+const canvas =
+    document.getElementById("overlay");
+
+const ctx =
+    canvas.getContext("2d");
+
+const startBtn =
+    document.getElementById("startBtn");
+
+const stopBtn =
+    document.getElementById("stopBtn");
 
 const systemStatus =
     document.getElementById("systemStatus");
@@ -49,16 +57,49 @@ const progressBar =
 const reasonText =
     document.getElementById("reasonText");
 
+const trendText =
+    document.getElementById("trendText");
+
+const generateReportButton =
+    document.getElementById(
+        "generateReportBtn"
+    );
+
+const pdfLink =
+    document.getElementById("pdfLink");
+
+const reportStatus =
+    document.getElementById(
+        "reportStatus"
+    );
+
+
+/* ============================================================
+   PUBLIC BACKEND
+============================================================ */
+
+const BACKEND_URL =
+    "https://adaptive-cognitive-load-analysis.onrender.com";
+
+const WEBSOCKET_URL =
+    "wss://adaptive-cognitive-load-analysis.onrender.com/ws";
+
 
 /* ============================================================
    APPLICATION STATE
 ============================================================ */
 
 let faceLandmarker = null;
+
 let stream = null;
+
 let websocket = null;
 
 let running = false;
+
+let endingSession = false;
+
+let reportReady = false;
 
 let lastTimestamp = -1;
 
@@ -73,7 +114,7 @@ let blinkTimes = [];
 
 
 /* ============================================================
-   HEAD STATE
+   HEAD MOVEMENT STATE
 ============================================================ */
 
 let previousNose = null;
@@ -87,14 +128,14 @@ let websocketConnected = false;
 
 
 /* ============================================================
-   SESSION
+   SESSION STATE
 ============================================================ */
 
 let sessionStart = 0;
 
 
 /* ============================================================
-   MEDIA PIPE INITIALIZATION
+   FACE LANDMARKER
 ============================================================ */
 
 async function initializeFaceLandmarker() {
@@ -112,7 +153,6 @@ async function initializeFaceLandmarker() {
     faceLandmarker =
         await FaceLandmarker.createFromOptions(
             vision,
-
             {
                 baseOptions: {
 
@@ -157,7 +197,7 @@ function connectWebSocket() {
 
             websocket =
                 new WebSocket(
-                    "ws://127.0.0.1:8000/ws"
+                    WEBSOCKET_URL
                 );
 
 
@@ -181,7 +221,6 @@ function connectWebSocket() {
                         JSON.parse(
                             event.data
                         );
-
 
                     handleServerMessage(
                         message
@@ -207,12 +246,17 @@ function connectWebSocket() {
                 websocketConnected =
                     false;
 
-                systemStatus.textContent =
-                    "Backend connection error";
+
+                if (!endingSession) {
+
+                    systemStatus.textContent =
+                        "Backend connection error";
+                }
+
 
                 reject(
                     new Error(
-                        "Could not connect to FastAPI backend."
+                        "Could not connect to the analysis server."
                     )
                 );
             };
@@ -223,7 +267,18 @@ function connectWebSocket() {
                 websocketConnected =
                     false;
 
-                if (running) {
+
+                /*
+                 * Don't overwrite the report-ready
+                 * status after the server closes the
+                 * connection intentionally.
+                 */
+
+                if (
+                    running &&
+                    !endingSession &&
+                    !reportReady
+                ) {
 
                     systemStatus.textContent =
                         "Backend disconnected";
@@ -240,6 +295,112 @@ function connectWebSocket() {
 
 function handleServerMessage(message) {
 
+    /* --------------------------------------------------------
+       REPORT READY
+    -------------------------------------------------------- */
+
+    if (
+        message.type ===
+        "report_ready"
+    ) {
+
+        reportReady =
+            true;
+
+
+        const pdfUrl =
+            `${BACKEND_URL}${message.pdf}`;
+
+
+        if (pdfLink) {
+
+            pdfLink.href =
+                pdfUrl;
+
+            pdfLink.classList.remove(
+                "hidden"
+            );
+        }
+
+
+        if (reportStatus) {
+
+            reportStatus.textContent =
+                "Report generated successfully.";
+        }
+
+
+        if (generateReportButton) {
+
+            generateReportButton.disabled =
+                false;
+
+            generateReportButton.textContent =
+                "Report Generated";
+        }
+
+
+        systemStatus.textContent =
+            "Session complete — report ready";
+
+
+        if (calibrationText) {
+
+            calibrationText.textContent =
+                "Session complete — report ready";
+        }
+
+
+        finishCameraCleanup();
+
+        return;
+    }
+
+
+    /* --------------------------------------------------------
+       REPORT ERROR
+    -------------------------------------------------------- */
+
+    if (
+        message.type ===
+        "report_error"
+    ) {
+
+        reportReady =
+            false;
+
+
+        if (reportStatus) {
+
+            reportStatus.textContent =
+                `Report generation failed: ${message.message}`;
+        }
+
+
+        if (generateReportButton) {
+
+            generateReportButton.disabled =
+                false;
+
+            generateReportButton.textContent =
+                "Generate Report";
+        }
+
+
+        systemStatus.textContent =
+            "Session complete";
+
+
+        finishCameraCleanup();
+
+        return;
+    }
+
+
+    /* --------------------------------------------------------
+       RESET ACK
+    -------------------------------------------------------- */
+
     if (
         message.type ===
         "reset_ack"
@@ -248,6 +409,10 @@ function handleServerMessage(message) {
         return;
     }
 
+
+    /* --------------------------------------------------------
+       ANALYSIS RESULT
+    -------------------------------------------------------- */
 
     if (
         message.type !==
@@ -262,9 +427,9 @@ function handleServerMessage(message) {
         message.data;
 
 
-    /* --------------------------------------------------------
+    /* ========================================================
        CALIBRATION
-    -------------------------------------------------------- */
+    ======================================================== */
 
     if (
         data.phase ===
@@ -274,106 +439,186 @@ function handleServerMessage(message) {
         const progress =
             Math.round(
                 (
-                    data.calibration_progress
-                    || 0
+                    data.calibration_progress ||
+                    0
                 ) * 100
             );
 
 
-        calibrationText.textContent =
-            "Building personalized baseline";
+        if (calibrationText) {
+
+            calibrationText.textContent =
+                "Building personalized baseline";
+        }
 
 
-        calibrationTime.textContent =
-            `${progress}%`;
+        if (calibrationTime) {
+
+            calibrationTime.textContent =
+                `${progress} / 100%`;
+        }
 
 
-        progressBar.style.width =
-            `${progress}%`;
+        if (progressBar) {
+
+            progressBar.style.width =
+                `${progress}%`;
+        }
 
 
-        cliValue.textContent =
-            "--";
+        if (cliValue) {
+
+            cliValue.textContent =
+                "--";
+        }
 
 
-        phaseValue.textContent =
-            "Calibrating";
+        if (phaseValue) {
+
+            phaseValue.textContent =
+                "Calibrating";
+        }
 
 
-        blinkValue.textContent =
-            `${Math.round(data.blink_rate)}/min`;
+        if (blinkValue) {
+
+            blinkValue.textContent =
+                `${Math.round(data.blink_rate || 0)}/min`;
+        }
 
 
-        gazeValue.textContent =
-            Number(
-                data.gaze_deviation || 0
-            ).toFixed(3);
+        if (gazeValue) {
+
+            gazeValue.textContent =
+                Number(
+                    data.gaze_deviation || 0
+                ).toFixed(3);
+        }
 
 
-        jitterValue.textContent =
-            Number(
-                data.head_jitter || 0
-            ).toFixed(4);
+        if (jitterValue) {
+
+            jitterValue.textContent =
+                Number(
+                    data.head_jitter || 0
+                ).toFixed(4);
+        }
 
 
-        stabilityValue.textContent =
-            "--";
+        if (stabilityValue) {
+
+            stabilityValue.textContent =
+                "--";
+        }
 
 
-        reasonText.textContent =
-            "Analyzing your normal behavioral pattern.";
+        if (reasonText) {
+
+            reasonText.textContent =
+                "Analyzing your normal behavioral pattern.";
+        }
+
+
+        if (trendText) {
+
+            trendText.textContent =
+                "Phase will be determined from the recent cognitive-load trend after calibration.";
+        }
+
 
         return;
     }
 
 
-    /* --------------------------------------------------------
+    /* ========================================================
        LIVE ANALYSIS
-    -------------------------------------------------------- */
+    ======================================================== */
 
-    calibrationText.textContent =
-        "Calibration complete — live analysis active";
+    if (cliValue) {
 
-
-    calibrationTime.textContent =
-        "Complete";
-
-
-    progressBar.style.width =
-        "100%";
+        cliValue.textContent =
+            `${Math.round(data.cli)}%`;
+    }
 
 
-    cliValue.textContent =
-        `${Math.round(data.cli)}%`;
+    if (phaseValue) {
+
+        phaseValue.textContent =
+            data.phase;
+    }
 
 
-    phaseValue.textContent =
-        data.phase;
+    if (blinkValue) {
+
+        blinkValue.textContent =
+            `${Math.round(data.blink_rate || 0)}/min`;
+    }
 
 
-    blinkValue.textContent =
-        `${Math.round(data.blink_rate)}/min`;
+    if (gazeValue) {
+
+        gazeValue.textContent =
+            Number(
+                data.gaze_deviation || 0
+            ).toFixed(3);
+    }
 
 
-    gazeValue.textContent =
-        Number(
-            data.gaze_deviation
-        ).toFixed(3);
+    if (jitterValue) {
+
+        jitterValue.textContent =
+            Number(
+                data.head_jitter || 0
+            ).toFixed(4);
+    }
 
 
-    jitterValue.textContent =
-        Number(
-            data.head_jitter
-        ).toFixed(4);
+    if (stabilityValue) {
+
+        stabilityValue.textContent =
+            `${Math.round(data.stability || 0)}%`;
+    }
 
 
-    stabilityValue.textContent =
-        `${Math.round(data.stability)}%`;
+    if (calibrationText) {
 
+        calibrationText.textContent =
+            "Calibration complete — live analysis active";
+    }
+
+
+    if (calibrationTime) {
+
+        calibrationTime.textContent =
+            "Complete";
+    }
+
+
+    if (progressBar) {
+
+        progressBar.style.width =
+            "100%";
+    }
+
+
+    /*
+     * Explain why the current result looks the way it does.
+     */
 
     updateExplanation(
         data
     );
+
+
+    /*
+     * Show that Phase is based on the rolling trend.
+     */
+
+    if (trendText) {
+
+        trendText.textContent =
+            `Current CLI: ${Math.round(data.cli)}% • Phase is based on the recent 30-sample trend.`;
+    }
 }
 
 
@@ -387,7 +632,7 @@ function updateExplanation(data) {
 
 
     if (
-        data.fatigue >
+        Number(data.fatigue || 0) >
         1.5
     ) {
 
@@ -398,7 +643,7 @@ function updateExplanation(data) {
 
 
     if (
-        data.distraction >
+        Number(data.distraction || 0) >
         1.5
     ) {
 
@@ -409,7 +654,7 @@ function updateExplanation(data) {
 
 
     if (
-        data.stress >
+        Number(data.stress || 0) >
         1.5
     ) {
 
@@ -423,21 +668,27 @@ function updateExplanation(data) {
         reasons.length === 0
     ) {
 
-        reasonText.textContent =
-            "Behavioral signals are within the personalized baseline range.";
+        if (reasonText) {
+
+            reasonText.textContent =
+                "Behavioral signals are within the personalized baseline range.";
+        }
 
     } else {
 
-        reasonText.textContent =
-            reasons.join(
-                " • "
-            );
+        if (reasonText) {
+
+            reasonText.textContent =
+                reasons.join(
+                    " • "
+                );
+        }
     }
 }
 
 
 /* ============================================================
-   CAMERA START
+   START CAMERA
 ============================================================ */
 
 async function startCamera() {
@@ -447,6 +698,19 @@ async function startCamera() {
         startBtn.disabled =
             true;
 
+        stopBtn.disabled =
+            true;
+
+
+        endingSession =
+            false;
+
+        reportReady =
+            false;
+
+
+        resetSession();
+
 
         if (!faceLandmarker) {
 
@@ -455,19 +719,24 @@ async function startCamera() {
 
 
         /*
-         * Connect to Python backend.
+         * Create a fresh WebSocket session.
          */
 
         if (
-            !websocketConnected
+            websocket &&
+            websocket.readyState !==
+            WebSocket.CLOSED
         ) {
 
-            await connectWebSocket();
+            websocket.close();
         }
 
 
+        await connectWebSocket();
+
+
         /*
-         * Request browser camera.
+         * Request local webcam.
          */
 
         stream =
@@ -499,9 +768,6 @@ async function startCamera() {
         await video.play();
 
 
-        resetSession();
-
-
         running =
             true;
 
@@ -509,9 +775,6 @@ async function startCamera() {
         sessionStart =
             performance.now();
 
-
-        startBtn.disabled =
-            true;
 
         stopBtn.disabled =
             false;
@@ -525,10 +788,10 @@ async function startCamera() {
             processFrame
         );
 
-
     } catch (error) {
 
         console.error(
+            "Camera startup error:",
             error
         );
 
@@ -538,20 +801,118 @@ async function startCamera() {
 
 
         reasonText.textContent =
-            error.message;
+            error.message ||
+            "Unable to start camera.";
 
 
         startBtn.disabled =
+            false;
+
+        stopBtn.disabled =
+            true;
+
+
+        if (stream) {
+
+            stream
+                .getTracks()
+                .forEach(
+                    track =>
+                        track.stop()
+                );
+
+            stream = null;
+        }
+
+
+        if (
+            websocket &&
+            websocket.readyState ===
+            WebSocket.OPEN
+        ) {
+
+            websocket.close();
+        }
+
+        websocket = null;
+
+        websocketConnected =
             false;
     }
 }
 
 
 /* ============================================================
-   CAMERA STOP
+   STOP CAMERA
 ============================================================ */
 
 function stopCamera() {
+
+    /*
+     * Stop frame processing first.
+     * Keep the WebSocket alive because the backend
+     * must generate the report and send it back.
+     */
+
+    running =
+        false;
+
+    endingSession =
+        true;
+
+
+    startBtn.disabled =
+        true;
+
+    stopBtn.disabled =
+        true;
+
+
+    systemStatus.textContent =
+        "Finalizing session report...";
+
+
+    if (reportStatus) {
+
+        reportStatus.textContent =
+            "Finalizing session and generating report...";
+    }
+
+
+    /*
+     * Tell FastAPI to finish this exact session.
+     */
+
+    if (
+        websocket &&
+        websocket.readyState ===
+        WebSocket.OPEN
+    ) {
+
+        websocket.send(
+            JSON.stringify({
+                type:
+                    "end_session"
+            })
+        );
+
+    } else {
+
+        /*
+         * If there's no WebSocket connection,
+         * just clean up locally.
+         */
+
+        finishCameraCleanup();
+    }
+}
+
+
+/* ============================================================
+   CAMERA CLEANUP
+============================================================ */
+
+function finishCameraCleanup() {
 
     running =
         false;
@@ -575,6 +936,18 @@ function stopCamera() {
         null;
 
 
+    startBtn.disabled =
+        false;
+
+    stopBtn.disabled =
+        true;
+
+
+    /*
+     * Do not immediately destroy the websocket
+     * here if the server is still closing it.
+     */
+
     if (
         websocket &&
         websocket.readyState ===
@@ -593,28 +966,38 @@ function stopCamera() {
         false;
 
 
-    startBtn.disabled =
-        false;
+    /*
+     * Do not overwrite report-ready state.
+     */
 
-    stopBtn.disabled =
-        true;
+    if (!reportReady) {
 
-
-    systemStatus.textContent =
-        "Session stopped";
-
-
-    calibrationText.textContent =
-        "Start the camera to begin";
+        systemStatus.textContent =
+            "Session stopped";
+    }
 
 
-    calibrationTime.textContent =
-        "0 / 60 s";
+    /*
+     * Allow a new report to be generated
+     * only if a report wasn't already delivered.
+     */
+
+    if (
+        generateReportButton &&
+        !reportReady
+    ) {
+
+        generateReportButton.disabled =
+            false;
+
+        generateReportButton.textContent =
+            "Generate Report";
+    }
 }
 
 
 /* ============================================================
-   RESET
+   RESET SESSION UI
 ============================================================ */
 
 function resetSession() {
@@ -622,62 +1005,132 @@ function resetSession() {
     blinkState =
         false;
 
-
     blinkTimes =
         [];
 
-
     previousNose =
         null;
-
 
     lastTimestamp =
         -1;
 
 
-    calibrationText.textContent =
-        "Building personalized baseline";
+    reportReady =
+        false;
+
+    endingSession =
+        false;
 
 
-    calibrationTime.textContent =
-        "0 / 60 s";
+    if (calibrationText) {
+
+        calibrationText.textContent =
+            "Building personalized baseline";
+    }
 
 
-    progressBar.style.width =
-        "0%";
+    if (calibrationTime) {
+
+        calibrationTime.textContent =
+            "0 / 60 s";
+    }
 
 
-    cliValue.textContent =
-        "--";
+    if (progressBar) {
+
+        progressBar.style.width =
+            "0%";
+    }
 
 
-    phaseValue.textContent =
-        "Calibrating";
+    if (cliValue) {
+
+        cliValue.textContent =
+            "--";
+    }
 
 
-    blinkValue.textContent =
-        "--";
+    if (phaseValue) {
+
+        phaseValue.textContent =
+            "Calibrating";
+    }
 
 
-    gazeValue.textContent =
-        "--";
+    if (blinkValue) {
+
+        blinkValue.textContent =
+            "--";
+    }
 
 
-    jitterValue.textContent =
-        "--";
+    if (gazeValue) {
+
+        gazeValue.textContent =
+            "--";
+    }
 
 
-    stabilityValue.textContent =
-        "--";
+    if (jitterValue) {
+
+        jitterValue.textContent =
+            "--";
+    }
 
 
-    reasonText.textContent =
-        "Establishing your personalized behavioral baseline.";
+    if (stabilityValue) {
+
+        stabilityValue.textContent =
+            "--";
+    }
+
+
+    if (reasonText) {
+
+        reasonText.textContent =
+            "Establishing your personalized behavioral baseline.";
+    }
+
+
+    if (trendText) {
+
+        trendText.textContent =
+            "Phase will be determined from the recent cognitive-load trend after calibration.";
+    }
+
+
+    if (generateReportButton) {
+
+        generateReportButton.disabled =
+            true;
+
+        generateReportButton.textContent =
+            "Generate Report";
+    }
+
+
+    if (pdfLink) {
+
+        pdfLink.classList.add(
+            "hidden"
+        );
+
+        pdfLink.removeAttribute(
+            "href"
+        );
+    }
+
+
+    if (reportStatus) {
+
+        reportStatus.textContent =
+            "No report generated yet.";
+    }
 }
 
 
 /* ============================================================
-   GEOMETRY
+   GEOMETRY HELPERS
 ============================================================ */
 
 function distance(a, b) {
@@ -710,6 +1163,7 @@ function center(points) {
     ) {
 
         x += point.x;
+
         y += point.y;
     }
 
@@ -733,13 +1187,11 @@ function eyeAspectRatio(points) {
             points[5]
         );
 
-
     const B =
         distance(
             points[2],
             points[4]
         );
-
 
     const C =
         distance(
@@ -765,7 +1217,7 @@ function eyeAspectRatio(points) {
 
 
 /* ============================================================
-   DRAW LANDMARKS
+   LANDMARK DRAWING
 ============================================================ */
 
 function drawLandmarks(landmarks) {
@@ -775,6 +1227,10 @@ function drawLandmarks(landmarks) {
             ctx
         );
 
+
+    /*
+     * Full face tessellation
+     */
 
     drawingUtils.drawConnectors(
         landmarks,
@@ -791,6 +1247,10 @@ function drawLandmarks(landmarks) {
     );
 
 
+    /*
+     * Face outline
+     */
+
     drawingUtils.drawConnectors(
         landmarks,
 
@@ -805,6 +1265,10 @@ function drawLandmarks(landmarks) {
         }
     );
 
+
+    /*
+     * Eyes
+     */
 
     drawingUtils.drawConnectors(
         landmarks,
@@ -836,6 +1300,10 @@ function drawLandmarks(landmarks) {
     );
 
 
+    /*
+     * Iris
+     */
+
     drawingUtils.drawConnectors(
         landmarks,
 
@@ -865,6 +1333,10 @@ function drawLandmarks(landmarks) {
         }
     );
 
+
+    /*
+     * Iris centers
+     */
 
     drawIrisCenter(
         landmarks,
@@ -1020,7 +1492,7 @@ function processFrame() {
 
 
     /* --------------------------------------------------------
-       FACE FOUND
+       FACE DETECTED
     -------------------------------------------------------- */
 
     if (
@@ -1044,8 +1516,11 @@ function processFrame() {
 
     } else {
 
-        reasonText.textContent =
-            "No face detected. Please position your face inside the camera frame.";
+        if (reasonText) {
+
+            reasonText.textContent =
+                "No face detected. Please position your face inside the camera frame.";
+        }
     }
 
 
@@ -1064,9 +1539,9 @@ function extractAndSendFeatures(
     now
 ) {
 
-    /*
-     * LEFT EYE
-     */
+    /* --------------------------------------------------------
+       LEFT EYE
+    -------------------------------------------------------- */
 
     const eyeIndices = [
         33,
@@ -1207,6 +1682,7 @@ function extractAndSendFeatures(
 
 
     previousNose = {
+
         x:
             nose.x,
 
@@ -1216,7 +1692,7 @@ function extractAndSendFeatures(
 
 
     /* --------------------------------------------------------
-       SEND FEATURES TO PYTHON
+       SEND FEATURES
     -------------------------------------------------------- */
 
     if (
@@ -1250,7 +1726,7 @@ function extractAndSendFeatures(
 
 
 /* ============================================================
-   BUTTONS
+   BUTTON EVENTS
 ============================================================ */
 
 startBtn.addEventListener(
