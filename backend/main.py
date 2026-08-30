@@ -5,9 +5,19 @@ import time
 import traceback
 from datetime import datetime
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi import (
+    FastAPI,
+    WebSocket,
+    WebSocketDisconnect
+)
+
+from fastapi.middleware.cors import (
+    CORSMiddleware
+)
+
+from fastapi.staticfiles import (
+    StaticFiles
+)
 
 
 # ============================================================
@@ -21,15 +31,24 @@ PROJECT_ROOT = os.path.dirname(
 )
 
 if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+    sys.path.insert(
+        0,
+        PROJECT_ROOT
+    )
 
 
 # ============================================================
-# PROJECT IMPORTS
+# IMPORTS
 # ============================================================
 
-from backend.cognitive_engine import CognitiveEngine
-from analysis.analysis_service import generate_latest_report
+from backend.cognitive_engine import (
+    CognitiveEngine
+)
+
+from analysis.analysis_service import (
+    generate_report_for_session,
+    generate_latest_report
+)
 
 
 # ============================================================
@@ -49,9 +68,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
+
     allow_origins=["*"],
+
     allow_credentials=True,
+
     allow_methods=["*"],
+
     allow_headers=["*"],
 )
 
@@ -83,7 +106,7 @@ os.makedirs(
 
 
 # ============================================================
-# STATIC OUTPUT FILES
+# STATIC REPORT FILES
 # ============================================================
 
 app.mount(
@@ -93,6 +116,14 @@ app.mount(
     ),
     name="outputs"
 )
+
+
+# ============================================================
+# CURRENT SESSION STATE
+# ============================================================
+
+LATEST_SESSION_PATH = None
+LATEST_REPORT_PATH = None
 
 
 # ============================================================
@@ -127,6 +158,9 @@ async def health():
 @app.get("/report/latest")
 async def latest_report():
 
+    global LATEST_SESSION_PATH
+    global LATEST_REPORT_PATH
+
     try:
 
         print()
@@ -142,75 +176,141 @@ async def latest_report():
             "=========================================="
         )
 
-        print(
-            f"Project root: {PROJECT_ROOT}"
-        )
+        # ----------------------------------------------------
+        # If we already generated the report, use it
+        # ----------------------------------------------------
 
-        print(
-            f"Output directory: {OUTPUT_DIR}"
-        )
+        if (
+            LATEST_REPORT_PATH
+            and os.path.isfile(
+                LATEST_REPORT_PATH
+            )
+        ):
 
-        # Generate report
-        pdf_path = generate_latest_report()
+            pdf_path = (
+                LATEST_REPORT_PATH
+            )
 
-        print(
-            f"Report generator returned: {pdf_path!r}"
-        )
+            print(
+                f"Using existing report: {pdf_path}"
+            )
 
-        # Validate path
-        if pdf_path is None:
+        else:
+
+            # ------------------------------------------------
+            # Prefer exact session from current connection
+            # ------------------------------------------------
+
+            if (
+                LATEST_SESSION_PATH
+                and os.path.isfile(
+                    LATEST_SESSION_PATH
+                )
+            ):
+
+                session_path = (
+                    LATEST_SESSION_PATH
+                )
+
+                print(
+                    f"Using current session: {session_path}"
+                )
+
+            else:
+
+                # --------------------------------------------
+                # Fallback for server restart
+                # --------------------------------------------
+
+                session_files = [
+                    os.path.join(
+                        DATA_DIR,
+                        filename
+                    )
+
+                    for filename
+                    in os.listdir(DATA_DIR)
+
+                    if (
+                        filename.startswith(
+                            "session_"
+                        )
+                        and filename.endswith(
+                            ".csv"
+                        )
+                    )
+                ]
+
+                if not session_files:
+
+                    raise FileNotFoundError(
+                        "No completed session CSV is available."
+                    )
+
+                session_path = max(
+                    session_files,
+                    key=os.path.getmtime
+                )
+
+                print(
+                    f"Using fallback session: {session_path}"
+                )
+
+            # ------------------------------------------------
+            # Generate PDF
+            # ------------------------------------------------
+
+            pdf_path = (
+                generate_report_for_session(
+                    session_path
+                )
+            )
+
+            LATEST_REPORT_PATH = (
+                pdf_path
+            )
+
+        # ----------------------------------------------------
+        # Validate PDF
+        # ----------------------------------------------------
+
+        if not pdf_path:
 
             raise RuntimeError(
-                "Report generator returned None."
+                "Report generation returned no PDF path."
             )
 
         pdf_path = os.fspath(
             pdf_path
         )
 
-        # Confirm PDF exists
         if not os.path.isfile(
             pdf_path
         ):
 
             raise FileNotFoundError(
-                f"Generated PDF does not exist: {pdf_path}"
-            )
-
-        # Security check:
-        # PDF must be inside OUTPUT_DIR
-        absolute_pdf = os.path.abspath(
-            pdf_path
-        )
-
-        absolute_output = os.path.abspath(
-            OUTPUT_DIR
-        )
-
-        if not absolute_pdf.startswith(
-            absolute_output + os.sep
-        ):
-
-            raise RuntimeError(
-                "Generated PDF is outside the output directory."
+                f"PDF not found: {pdf_path}"
             )
 
         filename = os.path.basename(
-            absolute_pdf
-        )
-
-        pdf_url = (
-            f"/outputs/{filename}"
+            pdf_path
         )
 
         print(
-            f"PDF ready: {absolute_pdf}"
+            f"PDF ready: {pdf_path}"
         )
 
         return {
-            "status": "success",
-            "pdf": pdf_url,
-            "filename": filename,
+
+            "status":
+                "success",
+
+            "pdf":
+                f"/outputs/{filename}",
+
+            "filename":
+                filename,
+
             "message":
                 "Latest session report generated successfully."
         }
@@ -227,8 +327,12 @@ async def latest_report():
         )
 
         return {
-            "status": "error",
-            "message": str(exc)
+
+            "status":
+                "error",
+
+            "message":
+                str(exc)
         }
 
 
@@ -241,18 +345,35 @@ async def websocket_endpoint(
     websocket: WebSocket
 ):
 
+    global LATEST_SESSION_PATH
+    global LATEST_REPORT_PATH
+
     await websocket.accept()
 
     engine = CognitiveEngine()
 
     session_id = datetime.now().strftime(
-        "%Y%m%d_%H%M%S"
+        "%Y%m%d_%H%M%S_%f"
     )
 
     session_path = os.path.join(
         DATA_DIR,
         f"session_{session_id}.csv"
     )
+
+    # --------------------------------------------------------
+    # This is now the current session
+    # --------------------------------------------------------
+
+    LATEST_SESSION_PATH = (
+        session_path
+    )
+
+    LATEST_REPORT_PATH = None
+
+    # --------------------------------------------------------
+    # Open CSV
+    # --------------------------------------------------------
 
     csv_file = open(
         session_path,
@@ -285,7 +406,9 @@ async def websocket_endpoint(
 
         while True:
 
-            data = await websocket.receive_json()
+            data = (
+                await websocket.receive_json()
+            )
 
             message_type = data.get(
                 "type",
@@ -314,13 +437,14 @@ async def websocket_endpoint(
                 csv_file.flush()
 
                 await websocket.send_json({
-                    "type": "reset_ack"
+                    "type":
+                        "reset_ack"
                 })
 
                 continue
 
             # ------------------------------------------------
-            # IGNORE UNKNOWN MESSAGES
+            # IGNORE UNKNOWN
             # ------------------------------------------------
 
             if message_type != "features":
@@ -328,7 +452,7 @@ async def websocket_endpoint(
                 continue
 
             # ------------------------------------------------
-            # READ FEATURES
+            # FEATURES
             # ------------------------------------------------
 
             blink_rate = float(
@@ -353,7 +477,7 @@ async def websocket_endpoint(
             )
 
             # ------------------------------------------------
-            # COGNITIVE ENGINE
+            # ENGINE
             # ------------------------------------------------
 
             result = engine.process(
@@ -363,7 +487,7 @@ async def websocket_endpoint(
             )
 
             # ------------------------------------------------
-            # SAVE CALIBRATION DATA
+            # SAVE
             # ------------------------------------------------
 
             if result["cli"] is None:
@@ -378,10 +502,6 @@ async def websocket_endpoint(
                     "",
                     ""
                 ])
-
-            # ------------------------------------------------
-            # SAVE LIVE DATA
-            # ------------------------------------------------
 
             else:
 
@@ -399,12 +519,16 @@ async def websocket_endpoint(
             csv_file.flush()
 
             # ------------------------------------------------
-            # SEND RESPONSE
+            # SEND RESULT
             # ------------------------------------------------
 
             await websocket.send_json({
-                "type": "analysis",
-                "data": result
+
+                "type":
+                    "analysis",
+
+                "data":
+                    result
             })
 
     except WebSocketDisconnect:
@@ -413,7 +537,7 @@ async def websocket_endpoint(
             f"Session disconnected: {session_id}"
         )
 
-    except Exception as exc:
+    except Exception:
 
         print(
             "WEBSOCKET ERROR"
@@ -423,23 +547,56 @@ async def websocket_endpoint(
             traceback.format_exc()
         )
 
-        try:
-
-            await websocket.close()
-
-        except Exception:
-            pass
-
     finally:
+
+        # ----------------------------------------------------
+        # CLOSE SESSION FILE FIRST
+        # ----------------------------------------------------
 
         try:
 
             csv_file.flush()
+
             csv_file.close()
 
         except Exception:
+
             pass
 
         print(
             f"Session saved: {session_path}"
         )
+
+        # ----------------------------------------------------
+        # Generate report for THIS exact session
+        # ----------------------------------------------------
+
+        try:
+
+            if os.path.isfile(
+                session_path
+            ):
+
+                print(
+                    "Generating session report..."
+                )
+
+                LATEST_REPORT_PATH = (
+                    generate_report_for_session(
+                        session_path
+                    )
+                )
+
+                print(
+                    f"Session report ready: {LATEST_REPORT_PATH}"
+                )
+
+        except Exception:
+
+            print(
+                "AUTOMATIC REPORT GENERATION ERROR"
+            )
+
+            print(
+                traceback.format_exc()
+            )
