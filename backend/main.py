@@ -16,7 +16,7 @@ PROJECT_ROOT = os.path.dirname(
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from cognitive_engine import CognitiveEngine
+from backend.cognitive_engine import CognitiveEngine
 from analysis.analysis_service import generate_latest_report
 
 
