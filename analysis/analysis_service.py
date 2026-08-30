@@ -46,6 +46,11 @@ OUTPUT_DIR = os.path.join(
 )
 
 os.makedirs(
+    SESSION_DIR,
+    exist_ok=True
+)
+
+os.makedirs(
     OUTPUT_DIR,
     exist_ok=True
 )
@@ -56,7 +61,6 @@ os.makedirs(
 # ============================================================
 
 def get_latest_session():
-
     files = glob.glob(
         os.path.join(
             SESSION_DIR,
@@ -76,7 +80,7 @@ def get_latest_session():
 
 
 # ============================================================
-# LOAD SESSION DATA
+# LOAD SESSION
 # ============================================================
 
 def load_session(csv_path):
@@ -124,7 +128,6 @@ def load_session(csv_path):
             errors="coerce"
         )
 
-    # Keep only post-calibration rows
     live_data = data[
         data["CognitiveLoad"].notna()
     ].copy()
@@ -132,10 +135,9 @@ def load_session(csv_path):
     if live_data.empty:
 
         raise ValueError(
-            "No post-calibration data exists in the selected session."
+            "Session contains no post-calibration analysis data."
         )
 
-    # Normalize time
     live_data["Time"] = (
         live_data["Time"]
         - live_data["Time"].iloc[0]
@@ -150,25 +152,22 @@ def load_session(csv_path):
 
 
 # ============================================================
-# SESSION STATISTICS
+# STATISTICS
 # ============================================================
 
 def calculate_statistics(data):
 
-    cli = (
-        data["CognitiveLoad"]
-        .dropna()
-    )
+    cli = data[
+        "CognitiveLoad"
+    ].dropna()
 
-    stability = (
-        data["Stability"]
-        .dropna()
-    )
+    stability = data[
+        "Stability"
+    ].dropna()
 
-    attention = (
-        data["AttentionSpan"]
-        .dropna()
-    )
+    attention = data[
+        "AttentionSpan"
+    ].dropna()
 
     phase_counts = (
         data["Phase"]
@@ -177,32 +176,34 @@ def calculate_statistics(data):
 
     total = len(data)
 
-    focused_count = phase_counts.get(
+    focused = phase_counts.get(
         "Focused",
         0
     )
 
-    overload_count = phase_counts.get(
+    overload = phase_counts.get(
         "Overload",
         0
     )
 
-    fatigue_count = phase_counts.get(
+    fatigue = phase_counts.get(
         "Fatigue",
         0
     )
 
-    warmup_count = phase_counts.get(
+    warmup = phase_counts.get(
         "Warm-up",
         0
     )
 
-    stats = {
+    return {
 
         "samples": total,
 
         "duration": (
-            float(data["Time"].max())
+            float(
+                data["Time"].max()
+            )
             if not data.empty
             else 0
         ),
@@ -238,31 +239,29 @@ def calculate_statistics(data):
         ),
 
         "focused_pct": (
-            focused_count / total * 100
+            focused / total * 100
             if total
             else 0
         ),
 
         "overload_pct": (
-            overload_count / total * 100
+            overload / total * 100
             if total
             else 0
         ),
 
         "fatigue_pct": (
-            fatigue_count / total * 100
+            fatigue / total * 100
             if total
             else 0
         ),
 
         "warmup_pct": (
-            warmup_count / total * 100
+            warmup / total * 100
             if total
             else 0
-        ),
+        )
     }
-
-    return stats
 
 
 # ============================================================
@@ -420,7 +419,7 @@ def create_signal_graph(data):
 
 
 # ============================================================
-# PHASE DISTRIBUTION
+# PHASE GRAPH
 # ============================================================
 
 def create_phase_graph(data):
@@ -430,7 +429,7 @@ def create_phase_graph(data):
         "phase_distribution.png"
     )
 
-    phase_order = [
+    order = [
         "Warm-up",
         "Focused",
         "Overload",
@@ -441,7 +440,7 @@ def create_phase_graph(data):
         data["Phase"]
         .value_counts()
         .reindex(
-            phase_order,
+            order,
             fill_value=0
         )
     )
@@ -485,7 +484,7 @@ def create_phase_graph(data):
 
 
 # ============================================================
-# CORRELATION MATRIX
+# CORRELATION GRAPH
 # ============================================================
 
 def create_correlation_graph(corr):
@@ -526,9 +525,6 @@ def create_correlation_graph(corr):
     plt.title(
         "Correlation Between Cognitive Signals"
     )
-
-    # Write correlation values
-    # inside heatmap cells
 
     for i in range(
         len(corr.columns)
@@ -596,10 +592,6 @@ def generate_insights(
         "fatigue_pct"
     ]
 
-    # --------------------------------------------------------
-    # CLI
-    # --------------------------------------------------------
-
     if avg_cli < 30:
 
         insights.append(
@@ -624,10 +616,6 @@ def generate_insights(
             "The session showed high cognitive-load levels."
         )
 
-    # --------------------------------------------------------
-    # Peak
-    # --------------------------------------------------------
-
     if peak_cli >= 75:
 
         insights.append(
@@ -640,19 +628,11 @@ def generate_insights(
             "The session reached the overload range."
         )
 
-    # --------------------------------------------------------
-    # Focus
-    # --------------------------------------------------------
-
     if focused >= 50:
 
         insights.append(
             "Focused behavior represented a substantial portion of the session."
         )
-
-    # --------------------------------------------------------
-    # Overload
-    # --------------------------------------------------------
 
     if overload >= 20:
 
@@ -660,19 +640,11 @@ def generate_insights(
             "A noticeable portion of the session was classified as overload."
         )
 
-    # --------------------------------------------------------
-    # Fatigue
-    # --------------------------------------------------------
-
     if fatigue >= 10:
 
         insights.append(
             "Fatigue-level behavior appeared during the session."
         )
-
-    # --------------------------------------------------------
-    # Stability
-    # --------------------------------------------------------
 
     if stability >= 80:
 
@@ -685,10 +657,6 @@ def generate_insights(
         insights.append(
             "The cognitive-load signal showed considerable variation."
         )
-
-    # --------------------------------------------------------
-    # Correlation insights
-    # --------------------------------------------------------
 
     for feature in [
         "BlinkRate",
@@ -719,17 +687,11 @@ def generate_insights(
                 f"{feature} showed a negative linear association with CognitiveLoad in this session."
             )
 
-    if not insights:
-
-        insights.append(
-            "The session did not contain enough variation for strong analytical insights."
-        )
-
     return insights
 
 
 # ============================================================
-# PDF CREATION
+# PDF
 # ============================================================
 
 def create_pdf(
@@ -795,10 +757,6 @@ def create_pdf(
 
     elements = []
 
-    # --------------------------------------------------------
-    # TITLE
-    # --------------------------------------------------------
-
     elements.append(
         Paragraph(
             "Advanced Cognitive Analysis Report",
@@ -814,7 +772,7 @@ def create_pdf(
     )
 
     # --------------------------------------------------------
-    # SESSION SUMMARY
+    # SUMMARY
     # --------------------------------------------------------
 
     elements.append(
@@ -825,10 +783,7 @@ def create_pdf(
     )
 
     summary_data = [
-        [
-            "Metric",
-            "Value"
-        ],
+        ["Metric", "Value"],
 
         [
             "Session Duration",
@@ -876,7 +831,6 @@ def create_pdf(
 
     table.setStyle(
         TableStyle([
-
             (
                 "BACKGROUND",
                 (0, 0),
@@ -907,13 +861,6 @@ def create_pdf(
             ),
 
             (
-                "FONTSIZE",
-                (0, 0),
-                (-1, -1),
-                9
-            ),
-
-            (
                 "ROWBACKGROUNDS",
                 (0, 1),
                 (-1, -1),
@@ -921,34 +868,18 @@ def create_pdf(
                     colors.whitesmoke,
                     colors.HexColor("#eef2f7")
                 ]
-            ),
-
-            (
-                "TOPPADDING",
-                (0, 0),
-                (-1, -1),
-                7
-            ),
-
-            (
-                "BOTTOMPADDING",
-                (0, 0),
-                (-1, -1),
-                7
             )
         ])
     )
 
-    elements.append(
-        table
-    )
+    elements.append(table)
 
     elements.append(
         Spacer(1, 20)
     )
 
     # --------------------------------------------------------
-    # PHASE DISTRIBUTION
+    # PHASE
     # --------------------------------------------------------
 
     elements.append(
@@ -956,100 +887,6 @@ def create_pdf(
             "2. Cognitive Phase Distribution",
             heading_style
         )
-    )
-
-    phase_data = [
-        [
-            "Phase",
-            "Percentage"
-        ],
-
-        [
-            "Warm-up",
-            f"{stats['warmup_pct']:.2f}%"
-        ],
-
-        [
-            "Focused",
-            f"{stats['focused_pct']:.2f}%"
-        ],
-
-        [
-            "Overload",
-            f"{stats['overload_pct']:.2f}%"
-        ],
-
-        [
-            "Fatigue",
-            f"{stats['fatigue_pct']:.2f}%"
-        ]
-    ]
-
-    phase_table = Table(
-        phase_data,
-        colWidths=[
-            3.0 * inch,
-            2.5 * inch
-        ]
-    )
-
-    phase_table.setStyle(
-        TableStyle([
-
-            (
-                "BACKGROUND",
-                (0, 0),
-                (-1, 0),
-                colors.HexColor("#1f2937")
-            ),
-
-            (
-                "TEXTCOLOR",
-                (0, 0),
-                (-1, 0),
-                colors.white
-            ),
-
-            (
-                "FONTNAME",
-                (0, 0),
-                (-1, 0),
-                "Helvetica-Bold"
-            ),
-
-            (
-                "GRID",
-                (0, 0),
-                (-1, -1),
-                0.5,
-                colors.grey
-            ),
-
-            (
-                "FONTSIZE",
-                (0, 0),
-                (-1, -1),
-                9
-            ),
-
-            (
-                "ROWBACKGROUNDS",
-                (0, 1),
-                (-1, -1),
-                [
-                    colors.whitesmoke,
-                    colors.HexColor("#eef2f7")
-                ]
-            )
-        ])
-    )
-
-    elements.append(
-        phase_table
-    )
-
-    elements.append(
-        Spacer(1, 15)
     )
 
     elements.append(
@@ -1065,7 +902,7 @@ def create_pdf(
     )
 
     # --------------------------------------------------------
-    # COGNITIVE LOAD
+    # CLI
     # --------------------------------------------------------
 
     elements.append(
@@ -1077,7 +914,7 @@ def create_pdf(
 
     elements.append(
         Paragraph(
-            "The timeline below shows how the estimated Cognitive Load Index changed throughout the live session.",
+            "The timeline shows the estimated Cognitive Load Index throughout the live session.",
             body_style
         )
     )
@@ -1099,7 +936,7 @@ def create_pdf(
     )
 
     # --------------------------------------------------------
-    # BEHAVIORAL SIGNALS
+    # SIGNALS
     # --------------------------------------------------------
 
     elements.append(
@@ -1134,7 +971,7 @@ def create_pdf(
 
     elements.append(
         Paragraph(
-            "Pearson correlation is used to examine linear relationships between the recorded behavioral signals and the estimated Cognitive Load Index.",
+            "Pearson correlation is used to examine linear relationships between behavioral signals and Cognitive Load.",
             body_style
         )
     )
@@ -1149,98 +986,6 @@ def create_pdf(
             width=5.7 * inch,
             height=4.7 * inch
         )
-    )
-
-    elements.append(
-        Spacer(1, 15)
-    )
-
-    correlation_table = [
-        [
-            "Signal",
-            "Correlation with CLI"
-        ]
-    ]
-
-    for feature in [
-        "BlinkRate",
-        "Stress",
-        "Distraction"
-    ]:
-
-        value = corr.loc[
-            feature,
-            "CognitiveLoad"
-        ]
-
-        correlation_table.append(
-            [
-                feature,
-                f"{value:.3f}"
-            ]
-        )
-
-    corr_table = Table(
-        correlation_table,
-        colWidths=[
-            3.0 * inch,
-            2.5 * inch
-        ]
-    )
-
-    corr_table.setStyle(
-        TableStyle([
-
-            (
-                "BACKGROUND",
-                (0, 0),
-                (-1, 0),
-                colors.HexColor("#1f2937")
-            ),
-
-            (
-                "TEXTCOLOR",
-                (0, 0),
-                (-1, 0),
-                colors.white
-            ),
-
-            (
-                "FONTNAME",
-                (0, 0),
-                (-1, 0),
-                "Helvetica-Bold"
-            ),
-
-            (
-                "GRID",
-                (0, 0),
-                (-1, -1),
-                0.5,
-                colors.grey
-            ),
-
-            (
-                "ALIGN",
-                (1, 1),
-                (1, -1),
-                "CENTER"
-            ),
-
-            (
-                "ROWBACKGROUNDS",
-                (0, 1),
-                (-1, -1),
-                [
-                    colors.whitesmoke,
-                    colors.HexColor("#eef2f7")
-                ]
-            )
-        ])
-    )
-
-    elements.append(
-        corr_table
     )
 
     elements.append(
@@ -1279,10 +1024,6 @@ def create_pdf(
     # --------------------------------------------------------
 
     elements.append(
-        Spacer(1, 15)
-    )
-
-    elements.append(
         Paragraph(
             "7. Methodology",
             heading_style
@@ -1312,17 +1053,12 @@ def create_pdf(
 
     elements.append(
         Paragraph(
-            "Disclaimer: The reported values are heuristic "
-            "behavioral indicators derived from visual signals "
-            "and should not be interpreted as clinical or "
-            "medical measurements.",
+            "Disclaimer: These values are heuristic behavioral "
+            "indicators derived from visual signals and are not "
+            "clinical or medical measurements.",
             body_style
         )
     )
-
-    # --------------------------------------------------------
-    # BUILD PDF
-    # --------------------------------------------------------
 
     doc.build(
         elements
@@ -1332,17 +1068,29 @@ def create_pdf(
 
 
 # ============================================================
-# MAIN PIPELINE
+# GENERATE REPORT FOR A SPECIFIC SESSION
 # ============================================================
 
-def generate_latest_report():
+def generate_report_for_session(
+    session_path
+):
 
-    session_path = (
-        get_latest_session()
-    )
+    if not session_path:
+
+        raise ValueError(
+            "Session path was not provided."
+        )
+
+    if not os.path.isfile(
+        session_path
+    ):
+
+        raise FileNotFoundError(
+            f"Session file does not exist: {session_path}"
+        )
 
     print(
-        f"Using session: {session_path}"
+        f"Generating report from: {session_path}"
     )
 
     _, data = load_session(
@@ -1390,59 +1138,24 @@ def generate_latest_report():
         corr_graph=corr_graph
     )
 
-    print()
     print(
-        "=========================================="
+        f"Report created: {pdf}"
     )
-    print(
-        "ANALYSIS COMPLETE"
-    )
-    print(
-        "=========================================="
-    )
-
-    print(
-        f"Average CLI       : {stats['average_cli']:.2f}"
-    )
-
-    print(
-        f"Peak CLI          : {stats['peak_cli']:.0f}"
-    )
-
-    print(
-        f"Average Stability : {stats['average_stability']:.2f}%"
-    )
-
-    print(
-        f"Focused           : {stats['focused_pct']:.2f}%"
-    )
-
-    print(
-        f"Overload          : {stats['overload_pct']:.2f}%"
-    )
-
-    print(
-        f"Fatigue           : {stats['fatigue_pct']:.2f}%"
-    )
-
-    print()
-
-    print(
-        f"PDF: {pdf}"
-    )
-
-    print(
-        f"Outputs: {OUTPUT_DIR}"
-    )
-
-    # ========================================================
-    # CRITICAL FIX
-    #
-    # FastAPI needs the actual PDF path.
-    # Without this return statement, Python returns None.
-    # ========================================================
 
     return pdf
+
+
+# ============================================================
+# BACKWARD-COMPATIBLE LATEST REPORT
+# ============================================================
+
+def generate_latest_report():
+
+    session_path = get_latest_session()
+
+    return generate_report_for_session(
+        session_path
+    )
 
 
 # ============================================================
@@ -1451,4 +1164,9 @@ def generate_latest_report():
 
 if __name__ == "__main__":
 
-    generate_latest_report()
+    pdf = generate_latest_report()
+
+    print()
+    print(
+        f"PDF: {pdf}"
+    )
