@@ -1,0 +1,468 @@
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+}
+
+body {
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+
+    background: #080c11;
+    color: #f4f7fb;
+}
+
+.app {
+    width: min(1500px, calc(100% - 48px));
+    margin: 0 auto;
+    padding: 34px 0 50px;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 30px;
+    margin-bottom: 28px;
+}
+
+.eyebrow {
+    margin-bottom: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: #8995a5;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: clamp(34px, 4vw, 48px);
+    line-height: 1.05;
+    letter-spacing: -1.5px;
+    font-weight: 750;
+}
+
+.header p {
+    margin: 12px 0 0;
+    color: #9ca8b8;
+    font-size: 17px;
+    line-height: 1.5;
+}
+
+.status {
+    flex-shrink: 0;
+    padding: 10px 16px;
+    border: 1px solid #273241;
+    border-radius: 999px;
+    background: #10161e;
+    color: #bfc8d4;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(350px, 1fr);
+    gap: 24px;
+    align-items: stretch;
+}
+
+.camera-card,
+.metric-card,
+.calibration-card,
+.explanation-card,
+.analytics-card {
+    background: linear-gradient(
+        180deg,
+        #121923 0%,
+        #101720 100%
+    );
+
+    border: 1px solid #222d3a;
+    border-radius: 20px;
+
+    box-shadow:
+        0 18px 50px rgba(0, 0, 0, 0.20);
+}
+
+.camera-card {
+    padding: 20px;
+}
+
+.camera-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #05080d;
+    border-radius: 16px;
+    border: 1px solid #202a36;
+}
+
+.camera-wrapper video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    transform: scaleX(-1);
+    background: #05080d;
+}
+
+.camera-wrapper canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    transform: scaleX(-1);
+}
+
+.controls {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.controls button {
+    appearance: none;
+    border: 1px solid #344253;
+    border-radius: 11px;
+    padding: 12px 20px;
+    background: #17202c;
+    color: #f5f7fa;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+
+    transition:
+        background 0.18s ease,
+        border-color 0.18s ease,
+        transform 0.18s ease;
+}
+
+.controls button:hover:not(:disabled) {
+    background: #1d2937;
+    border-color: #4a596c;
+    transform: translateY(-1px);
+}
+
+.controls button:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+}
+
+.dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.metric-card {
+    min-height: 148px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.metric-label {
+    display: block;
+    color: #8f9bab;
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 650;
+    letter-spacing: 1.5px;
+}
+
+.metric-card strong {
+    display: block;
+    margin-top: 14px;
+    color: #f5f7fb;
+    font-size: clamp(25px, 2.5vw, 34px);
+    line-height: 1.1;
+    font-weight: 750;
+    letter-spacing: -0.8px;
+}
+
+.calibration-card {
+    margin-top: 24px;
+    padding: 22px 24px;
+}
+
+.calibration-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.calibration-header h2 {
+    margin: 8px 0 0;
+    color: #edf1f6;
+    font-size: 20px;
+    line-height: 1.3;
+    font-weight: 650;
+}
+
+#calibrationTime {
+    flex-shrink: 0;
+    color: #d8dee7;
+    font-size: 17px;
+    font-weight: 650;
+}
+
+.progress {
+    width: 100%;
+    height: 10px;
+    margin-top: 18px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #202a35;
+}
+
+.progress-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+
+    background: linear-gradient(
+        90deg,
+        #66788b,
+        #aebdcb
+    );
+
+    transition:
+        width 0.15s linear;
+}
+
+.explanation-card {
+    margin-top: 24px;
+    padding: 22px 24px;
+}
+
+#reasonText {
+    margin-top: 10px;
+    color: #d1d8e1;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+
+/* ============================================================
+   ANALYTICS
+============================================================ */
+
+.analytics-grid {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 2fr)
+        minmax(340px, 1fr);
+
+    gap: 24px;
+    margin-top: 24px;
+}
+
+.analytics-card {
+    padding: 24px;
+}
+
+.analytics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    margin-bottom: 18px;
+}
+
+.analytics-card h2 {
+    margin: 8px 0 0;
+    font-size: 21px;
+    font-weight: 650;
+    color: #edf1f6;
+}
+
+.small-status {
+    padding: 7px 11px;
+    border-radius: 999px;
+    border: 1px solid #2a3543;
+    color: #aeb9c7;
+    background: #0e141b;
+    font-size: 12px;
+}
+
+.chart-wrapper {
+    position: relative;
+    width: 100%;
+    height: 320px;
+}
+
+.session-card p {
+    color: #9ca8b7;
+    line-height: 1.6;
+    font-size: 15px;
+    margin-top: 12px;
+    margin-bottom: 22px;
+}
+
+.session-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#generateReportBtn {
+    appearance: none;
+    border: 1px solid #425267;
+    border-radius: 11px;
+    padding: 13px 18px;
+    background: #1b2633;
+    color: #f5f7fa;
+    font-size: 15px;
+    font-weight: 650;
+    cursor: pointer;
+
+    transition:
+        background 0.18s ease,
+        border-color 0.18s ease;
+}
+
+#generateReportBtn:hover:not(:disabled) {
+    background: #233141;
+    border-color: #607186;
+}
+
+#generateReportBtn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.download-btn {
+    display: block;
+    text-align: center;
+    text-decoration: none;
+    border: 1px solid #344253;
+    border-radius: 11px;
+    padding: 13px 18px;
+    background: #141d27;
+    color: #dbe2ea;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.download-btn:hover {
+    background: #1c2835;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.report-status {
+    margin-top: 16px;
+    color: #9eabb9;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+
+/* ============================================================
+   FOOTER
+============================================================ */
+
+.footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin-top: 28px;
+    padding-top: 18px;
+    border-top: 1px solid #202a35;
+    color: #738092;
+    font-size: 12px;
+}
+
+
+/* ============================================================
+   RESPONSIVE
+============================================================ */
+
+@media (max-width: 1100px) {
+
+    .main-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 760px) {
+
+    .app {
+        width: min(100% - 28px, 1500px);
+        padding-top: 22px;
+    }
+
+    .header {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .header h1 {
+        font-size: 34px;
+    }
+
+    .dashboard {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .calibration-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .analytics-header {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 520px) {
+
+    .dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-card {
+        min-height: 120px;
+    }
+
+    .camera-card {
+        padding: 12px;
+    }
+
+    .camera-wrapper {
+        border-radius: 12px;
+    }
+
+    .footer {
+        flex-direction: column;
+    }
+}

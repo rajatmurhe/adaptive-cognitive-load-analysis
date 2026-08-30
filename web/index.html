@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Adaptive Cognitive Vision
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+    <!-- Chart.js -->
+    <script
+        src="https://cdn.jsdelivr.net/npm/chart.js"
+    ></script>
+
+    <script
+        type="module"
+        src="app.js"
+    ></script>
+
+    <script
+        type="module"
+        src="dashboard.js"
+    ></script>
+
+</head>
+
+
+<body>
+
+<main class="app">
+
+
+    <!-- ======================================================
+         HEADER
+    ======================================================= -->
+
+    <header class="header">
+
+        <div>
+
+            <div class="eyebrow">
+                REAL-TIME COMPUTER VISION
+            </div>
+
+            <h1>
+                Adaptive Cognitive Vision
+            </h1>
+
+            <p>
+                Explainable behavioral analysis from webcam video
+            </p>
+
+        </div>
+
+
+        <div
+            id="systemStatus"
+            class="status"
+        >
+            Initializing...
+        </div>
+
+    </header>
+
+
+
+    <!-- ======================================================
+         CAMERA + METRICS
+    ======================================================= -->
+
+    <section class="main-grid">
+
+
+        <!-- CAMERA -->
+
+        <div class="camera-card">
+
+            <div class="camera-wrapper">
+
+                <video
+                    id="video"
+                    autoplay
+                    playsinline
+                    muted
+                ></video>
+
+                <canvas
+                    id="overlay"
+                ></canvas>
+
+            </div>
+
+
+            <div class="controls">
+
+                <button
+                    id="startBtn"
+                >
+                    Start Camera
+                </button>
+
+
+                <button
+                    id="stopBtn"
+                    disabled
+                >
+                    Stop Camera
+                </button>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- METRICS -->
+
+        <aside class="dashboard">
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    COGNITIVE LOAD
+                </span>
+
+                <strong id="cliValue">
+                    --
+                </strong>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    PHASE
+                </span>
+
+                <strong id="phaseValue">
+                    Waiting
+                </strong>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    BLINK RATE
+                </span>
+
+                <strong id="blinkValue">
+                    --
+                </strong>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    GAZE DEVIATION
+                </span>
+
+                <strong id="gazeValue">
+                    --
+                </strong>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    HEAD JITTER
+                </span>
+
+                <strong id="jitterValue">
+                    --
+                </strong>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <span class="metric-label">
+                    STABILITY
+                </span>
+
+                <strong id="stabilityValue">
+                    --
+                </strong>
+
+            </div>
+
+
+        </aside>
+
+    </section>
+
+
+
+    <!-- ======================================================
+         CALIBRATION
+    ======================================================= -->
+
+    <section class="calibration-card">
+
+
+        <div class="calibration-header">
+
+
+            <div>
+
+                <span class="metric-label">
+                    PERSONALIZED CALIBRATION
+                </span>
+
+                <h2 id="calibrationText">
+                    Start the camera to begin
+                </h2>
+
+            </div>
+
+
+            <span id="calibrationTime">
+                0 / 60 s
+            </span>
+
+
+        </div>
+
+
+        <div class="progress">
+
+            <div
+                id="progressBar"
+                class="progress-fill"
+            ></div>
+
+        </div>
+
+
+    </section>
+
+
+
+    <!-- ======================================================
+         EXPLANATION
+    ======================================================= -->
+
+    <section class="explanation-card">
+
+        <span class="metric-label">
+            CURRENT SIGNAL INTERPRETATION
+        </span>
+
+        <div id="reasonText">
+            No analysis yet.
+        </div>
+
+    </section>
+
+
+
+    <!-- ======================================================
+         LIVE ANALYTICS
+    ======================================================= -->
+
+    <section class="analytics-grid">
+
+
+        <!-- COGNITIVE LOAD GRAPH -->
+
+        <div class="analytics-card">
+
+            <div class="analytics-header">
+
+                <div>
+
+                    <span class="metric-label">
+                        TEMPORAL ANALYSIS
+                    </span>
+
+                    <h2>
+                        Cognitive Load Over Time
+                    </h2>
+
+                </div>
+
+                <span
+                    id="chartStatus"
+                    class="small-status"
+                >
+                    Waiting for session
+                </span>
+
+            </div>
+
+
+            <div class="chart-wrapper">
+
+                <canvas
+                    id="cliChart"
+                ></canvas>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- SESSION ACTIONS -->
+
+        <div class="analytics-card session-card">
+
+            <span class="metric-label">
+                SESSION ANALYSIS
+            </span>
+
+            <h2>
+                Session Results
+            </h2>
+
+            <p>
+                Complete a session to generate
+                the analytical outputs and PDF report.
+            </p>
+
+
+            <div class="session-actions">
+
+                <button
+                    id="generateReportBtn"
+                    disabled
+                >
+                    Generate Report
+                </button>
+
+
+                <a
+                    id="pdfLink"
+                    class="download-btn hidden"
+                    target="_blank"
+                >
+                    Open PDF Report
+                </a>
+
+            </div>
+
+
+            <div
+                id="reportStatus"
+                class="report-status"
+            >
+                No report generated yet.
+            </div>
+
+        </div>
+
+
+    </section>
+
+
+
+    <!-- ======================================================
+         FOOTER
+    ======================================================= -->
+
+    <footer class="footer">
+
+        <span>
+            Adaptive Cognitive Vision
+        </span>
+
+        <span>
+            Browser-side Computer Vision + FastAPI
+        </span>
+
+    </footer>
+
+
+</main>
+
+</body>
+
+</html>
