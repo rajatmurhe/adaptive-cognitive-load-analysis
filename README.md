@@ -306,6 +306,7 @@ Important: correlation indicates statistical association, not causation.
 
 Automated PDF Report
 
+```text
 A completed session can be converted into an analytical report containing:
 
 Session Summary
@@ -321,6 +322,8 @@ Correlation Analysis
 Automated Behavioral Insights
         ↓
 Methodology + Disclaimer
+
+```
 
 Tech Stack
 Category	Technologies
